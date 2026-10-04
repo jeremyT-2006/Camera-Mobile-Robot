@@ -33,10 +33,10 @@ if not cap.isOpened():
     cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
-    print("❌ Lỗi: Không thể mở được camera nào. Vui lòng kiểm tra lại cáp kết nối!")
+    print(" Lỗi: Không thể mở được camera nào. Vui lòng kiểm tra lại cáp kết nối!")
     exit(1)
 
-print("✅ Đã kết nối Camera thành công!")
+print(" Đã kết nối Camera thành công!")
 
 output_frame = None
 lock = threading.Lock()
