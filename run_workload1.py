@@ -29,7 +29,7 @@ if not cap.isOpened():
     active_sensor = 1
 
 if not cap.isOpened():
-    print("❌ Lỗi: Không thể mở camera.")
+    print(" Lỗi: Không thể mở camera.")
     exit()
 
 time.sleep(1)
@@ -38,9 +38,9 @@ start_time = time.time()
 prev_time = time.time()
 
 print("="*55)
-print(f"✅ ĐANG CHẠY KỊCH BẢN 1 (CAMERA HIỂN THỊ LIÊN TỤC)")
-print("👉 Bạn hãy dùng Đồng hồ vạn năng để tự đo sụt áp của Pin.")
-print("👉 Bấm phím 'q' trên màn hình Dell khi muốn dừng thí nghiệm.")
+print(f" ĐANG CHẠY KỊCH BẢN 1 (CAMERA HIỂN THỊ LIÊN TỤC)")
+print("Bạn hãy dùng Đồng hồ vạn năng để tự đo sụt áp của Pin.")
+print("Bấm phím 'q' trên màn hình Dell khi muốn dừng thí nghiệm.")
 print("="*55)
 
 while True:
