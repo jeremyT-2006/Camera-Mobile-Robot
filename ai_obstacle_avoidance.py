@@ -7,9 +7,9 @@ try:
     import jetson.inference
     import jetson.utils
     USE_JETSON_INFERENCE = True
-    print("✅ Đã phát hiện thư viện NVIDIA TensorRT (jetson.inference)!")
+    print("Đã phát hiện thư viện NVIDIA TensorRT (jetson.inference)!")
 except ImportError:
-    print("⚠️ Chưa có jetson.inference, chương trình sẽ chạy chế độ camera thuần.")
+    print("Chưa có jetson.inference, chương trình sẽ chạy chế độ camera thuần.")
 
 def gstreamer_pipeline(sensor_id=0, capture_width=1280, capture_height=720, display_width=640, display_height=480, framerate=30, flip_method=0):
     return (
@@ -27,7 +27,7 @@ if not cap.isOpened():
     cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
 
 if not cap.isOpened():
-    print("❌ Lỗi: Không thể mở camera CSI. Vui lòng kiểm tra lại cáp.")
+    print("Lỗi: Không thể mở camera CSI. Vui lòng kiểm tra lại cáp.")
     sys.exit()
 
 time.sleep(1)
@@ -36,7 +36,7 @@ net = None
 if USE_JETSON_INFERENCE:
     print("Đang nạp mô hình AI SSD-MobileNet-v2 (TensorRT)...")
     net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=0.45)
-    print("✅ Nạp Model AI thành công!")
+    print("Nạp Model AI thành công!")
 
 WIDTH = 640
 HEIGHT = 480
@@ -45,7 +45,7 @@ ZONE_RIGHT_LIMIT = 2 * (WIDTH // 3)
 
 prev_time = time.time()
 print("\n" + "="*60)
-print("🚀 HỆ THỐNG TRÁNH VẬT CẢN (OBSTACLE AVOIDANCE) ĐANG CHẠY!")
+print("HỆ THỐNG TRÁNH VẬT CẢN (OBSTACLE AVOIDANCE) ĐANG CHẠY!")
 print("Bấm phím 'q' trên màn hình Dell để THOÁT.")
 print("="*60 + "\n")
 
