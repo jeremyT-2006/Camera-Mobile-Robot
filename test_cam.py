@@ -26,12 +26,12 @@ if not cap.isOpened():
     cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
 
 if not cap.isOpened():
-    print("❌ Không mở được camera. Vui lòng kiểm tra lại cáp.")
+    print(" Không mở được camera. Vui lòng kiểm tra lại cáp.")
     exit()
 
 time.sleep(1)
 
-print("✅ ĐÃ MỞ CAMERA THÀNH CÔNG! Bấm 'q' để thoát.")
+print("ĐÃ MỞ CAMERA THÀNH CÔNG! Bấm 'q' để thoát.")
 
 while True:
     ret, frame = cap.read()
