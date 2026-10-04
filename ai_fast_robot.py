@@ -10,7 +10,7 @@ print("Đang nạp mô hình TensorRT...")
 net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=0.5)
 
 print("\n" + "="*60)
-print("🚀 HỆ THỐNG AI TỐC ĐỘ CAO (25 - 30 FPS) ĐANG CHẠY!")
+print("HỆ THỐNG AI TỐC ĐỘ CAO (25 - 30 FPS) ĐANG CHẠY!")
 print("Bấm phím 'q' hoặc đóng cửa sổ để thoát.")
 print("="*60 + "\n")
 
