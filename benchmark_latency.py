@@ -16,7 +16,6 @@ print("="*60)
 print("   BÀI THỬ NGHIỆM: ĐÁNH GIÁ ẢNH HƯỞNG CỦA ĐỊNH DẠNG DỮ LIỆU")
 print("="*60)
 
-# Khởi tạo Camera CSI
 cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=0), cv2.CAP_GSTREAMER)
 if not cap.isOpened():
     cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
@@ -29,7 +28,6 @@ else:
     ret, frame = cap.read()
     print("✅ Đã kết nối camera thành công!")
 
-# Giả lập kết quả nhận diện từ mô hình (3 vật thể: xe, người, biển báo)
 objects = [
     {"id": 1, "class": "car", "conf": 0.93, "bbox": [150, 200, 220, 180]},
     {"id": 2, "class": "person", "conf": 0.88, "bbox": [400, 180, 80, 210]},
@@ -38,14 +36,12 @@ objects = [
 
 trials = 2000
 
-# 1. JSON
 t0 = time.perf_counter()
 for _ in range(trials):
     data_json = json.dumps(objects).encode('utf-8')
 t_json = (time.perf_counter() - t0) / trials * 1000
 size_json = len(data_json)
 
-# 2. Plain Text / CSV ("id,x,y,w,h,conf;...\n")
 t0 = time.perf_counter()
 for _ in range(trials):
     rows = [f"{o['id']},{o['bbox'][0]},{o['bbox'][1]},{o['bbox'][2]},{o['bbox'][3]},{o['conf']:.2f}" for o in objects]
@@ -53,7 +49,6 @@ for _ in range(trials):
 t_csv = (time.perf_counter() - t0) / trials * 1000
 size_csv = len(data_csv)
 
-# 3. Raw Binary Struct (id: byte, x,y,w,h: short 2 bytes, conf: float 4 bytes) -> 13 bytes/obj
 t0 = time.perf_counter()
 for _ in range(trials):
     b_data = bytearray()
@@ -70,8 +65,7 @@ print(f"{'2. Plain Text (CSV)':<22} | {size_csv:>10} Bytes       | {t_csv:>14.4f
 print(f"{'3. Raw Binary Struct':<22} | {size_struct:>10} Bytes       | {t_struct:>14.4f} ms")
 print("-" * 72)
 
-# Tính thời gian truyền lý thuyết qua Serial (Baudrate 115200 bps ~ 11.52 KB/s)
-serial_speed = 11520 # bytes/sec
+serial_speed = 11520
 print("\nƯớc tính độ trễ truyền tải qua Serial (Baud 115200):")
 print(f"- JSON               : {(size_json / serial_speed) * 1000:.2f} ms")
 print(f"- Plain Text (CSV)   : {(size_csv / serial_speed) * 1000:.2f} ms")

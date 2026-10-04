@@ -52,17 +52,14 @@ while True:
     current_time = time.time()
     elapsed_seconds = int(current_time - start_time)
     
-    # Tính thời gian chạy (Giờ : Phút : Giây)
     hours = elapsed_seconds // 3600
     minutes = (elapsed_seconds % 3600) // 60
     seconds = elapsed_seconds % 60
     timer_str = f"Uptime: {hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    # Tính FPS
     fps = 1 / (current_time - prev_time) if (current_time - prev_time) > 0 else 0
     prev_time = current_time
 
-    # Vẽ đồng hồ đếm giờ và FPS lên màn hình camera
     cv2.putText(frame, f"KICH BAN 1: CAM ONLY", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
     cv2.putText(frame, timer_str, (20, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
     cv2.putText(frame, f"FPS: {fps:.1f}", (20, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)

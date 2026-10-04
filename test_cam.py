@@ -20,7 +20,6 @@ def gstreamer_pipeline(
     )
 
 print("Đang khởi động Camera...")
-# Thử khe 0 trước, nếu không được tự động chuyển sang khe 1
 cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=0), cv2.CAP_GSTREAMER)
 if not cap.isOpened():
     print("Khe 0 không phản hồi, đang chuyển sang khe 1...")
@@ -30,7 +29,6 @@ if not cap.isOpened():
     print("❌ Không mở được camera. Vui lòng kiểm tra lại cáp.")
     exit()
 
-# Đợi 1 giây để camera lấy nét và cân bằng sáng
 time.sleep(1)
 
 print("✅ ĐÃ MỞ CAMERA THÀNH CÔNG! Bấm 'q' để thoát.")
@@ -39,11 +37,10 @@ while True:
     ret, frame = cap.read()
     if not ret or frame is None:
         time.sleep(0.01)
-        continue  # Nếu lỡ rơi 1 khung hình thì đợi tiếp, KHÔNG TỰ THOÁT
+        continue
 
     cv2.imshow("Camera Jetson Nano", frame)
     
-    # Bấm phím q để tắt
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

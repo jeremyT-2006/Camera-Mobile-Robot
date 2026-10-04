@@ -23,13 +23,11 @@ def gstreamer_pipeline(
     )
 
 print("Đang kết nối camera...")
-# Thử camera CSI (Cổng 0 rồi đến cổng 1)
 cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=0), cv2.CAP_GSTREAMER)
 if not cap.isOpened():
     print("Khe 0 không phản hồi, thử khe 1...")
     cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
 
-# Nếu không phải CSI camera, thử mở USB Camera (/dev/video0)
 if not cap.isOpened():
     print("Không thấy camera CSI, thử tìm USB Camera...")
     cap = cv2.VideoCapture(0)
@@ -64,9 +62,9 @@ class CamStreamHandler(BaseHTTPRequestHandler):
             <head>
                 <title>Jetson Nano - Camera Live Stream</title>
                 <style>
-                    body { font-family: Arial, sans-serif; background: #222; color: #fff; text-align: center; padding-top: 20px; }
-                    h2 { color: #76b900; }
-                    img { border: 3px solid #76b900; border-radius: 8px; max-width: 90%; height: auto; }
+                    body { font-family: Arial, sans-serif; background:
+                    h2 { color:
+                    img { border: 3px solid
                 </style>
             </head>
             <body>
