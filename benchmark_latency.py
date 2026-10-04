@@ -21,12 +21,12 @@ if not cap.isOpened():
     cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
 
 if not cap.isOpened():
-    print("❌ Lỗi camera, dùng chế độ giả lập frame...")
+    print("Lỗi camera, dùng chế độ giả lập frame...")
     frame = None
 else:
     time.sleep(1)
     ret, frame = cap.read()
-    print("✅ Đã kết nối camera thành công!")
+    print("Đã kết nối camera thành công!")
 
 objects = [
     {"id": 1, "class": "car", "conf": 0.93, "bbox": [150, 200, 220, 180]},
