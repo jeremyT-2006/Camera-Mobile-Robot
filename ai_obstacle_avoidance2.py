@@ -22,9 +22,10 @@ def parse_args():
     parser.add_argument("--input", type=str, default="csi://0", help="Camera input URI (e.g. csi://0)")
     parser.add_argument("--network", type=str, default="ssd-mobilenet-v1", help="AI Model: ssd-mobilenet-v1 (Fastest, 25-30 FPS) or ssd-mobilenet-v2")
     parser.add_argument("--threshold", type=float, default=0.45, help="Detection confidence threshold")
-    parser.add_argument("--width", type=int, default=1280, help="Camera capture width")
-    parser.add_argument("--height", type=int, default=720, help="Camera capture height")
+    parser.add_argument("--width", type=int, default=640, help="Camera capture width (default 640)")
+    parser.add_argument("--height", type=int, default=480, help="Camera capture height (default 480)")
     parser.add_argument("--rate", type=int, default=30, help="Camera framerate")
+    parser.add_argument("--flip", type=str, default="none", choices=["none", "rotate-180", "horizontal", "vertical"], help="Camera flip (none matches v1, rotate-180 if upside down)")
     parser.add_argument("--headless", action="store_true", help="Run without graphical display for max FPS")
     parser.add_argument("--frame-skip", type=int, default=1, help="Inference every N frames (1=every frame, 2=every 2nd frame)")
     parser.add_argument("--kp", type=float, default=1.2, help="Proportional steering gain Kp")
@@ -37,6 +38,7 @@ def main():
     print("  HIGH-PERFORMANCE OBSTACLE AVOIDANCE SYSTEM (JETSON NANO)")
     print(f"  Model       : {args.network}")
     print(f"  Resolution  : {args.width}x{args.height} @ {args.rate} FPS")
+    print(f"  Camera Flip : {args.flip}")
     print(f"  Headless    : {args.headless}")
     print(f"  Frame Skip  : {args.frame_skip}")
     print(f"  Steering Kp : {args.kp}")
@@ -45,7 +47,8 @@ def main():
     cam_options = [
         f"--input-width={args.width}",
         f"--input-height={args.height}",
-        f"--input-rate={args.rate}"
+        f"--input-rate={args.rate}",
+        f"--input-flip={args.flip}"
     ]
     camera = jetson.utils.videoSource(args.input, argv=cam_options)
     if camera is None:
@@ -56,7 +59,7 @@ def main():
     font = None
     if not args.headless:
         display = jetson.utils.videoOutput("display://0")
-        font = jetson.utils.cudaFont(size=22)
+        font = jetson.utils.cudaFont(size=20)
 
     print(f"Loading TensorRT engine: {args.network}...")
     try:
@@ -65,6 +68,8 @@ def main():
         print(f"[ERROR] Failed to load model {args.network}: {e}")
         print("Falling back to ssd-mobilenet-v2...")
         net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=args.threshold)
+
+    net.SetOverlayAlpha(0.0)
 
     w = args.width
     h = args.height
@@ -100,7 +105,7 @@ def main():
 
             t1 = time.time()
             if do_inference:
-                overlay_flag = "none" if args.headless else "box,labels,conf"
+                overlay_flag = "none" if args.headless else "lines,labels,conf"
                 detections = net.Detect(img, overlay=overlay_flag)
                 last_detections = detections
             else:
@@ -154,7 +159,7 @@ def main():
 
             if display is not None:
                 hud_text = f"ACTION: {robot_action} | V:{v_lin:.2f} W:{w_ang:.2f} | FPS: {avg_fps:.1f}"
-                font.OverlayText(img, text=hud_text, x=15, y=h - 40, color=(0, 255, 0, 255), background=(0, 0, 0, 180))
+                font.OverlayText(img, text=hud_text, x=15, y=h - 35, color=(0, 255, 0, 255), background=(0, 0, 0, 180))
 
                 display.SetStatus(f"[{args.network}] FPS: {avg_fps:.1f} | Action: {robot_action}")
                 display.Render(img)
