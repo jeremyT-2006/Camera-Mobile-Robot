@@ -1,117 +1,177 @@
-import cv2
-import time
+import argparse
 import sys
+import time
 
-USE_JETSON_INFERENCE = False
 try:
     import jetson.inference
     import jetson.utils
-    USE_JETSON_INFERENCE = True
-    print("Đã phát hiện thư viện NVIDIA TensorRT (jetson.inference)!")
 except ImportError:
-    print("Chưa có jetson.inference, chương trình sẽ chạy chế độ camera thuần.")
+    try:
+        import jetson_inference as jetson_inference_lib
+        import jetson_utils as jetson_utils_lib
+        class JetsonContainer:
+            inference = jetson_inference_lib
+            utils = jetson_utils_lib
+        jetson = JetsonContainer()
+    except ImportError:
+        print("[ERROR] jetson.inference / jetson.utils not found on system.")
+        sys.exit(1)
 
-def gstreamer_pipeline(sensor_id=0, capture_width=1280, capture_height=720, display_width=640, display_height=480, framerate=30, flip_method=0):
-    return (
-        f"nvarguscamerasrc sensor-id={sensor_id} ! "
-        f"video/x-raw(memory:NVMM), width=(int){capture_width}, height=(int){capture_height}, format=(string)NV12, framerate=(fraction){framerate}/1 ! "
-        f"nvvidconv flip-method={flip_method} ! "
-        f"video/x-raw, width=(int){display_width}, height=(int){display_height}, format=(string)BGRx ! "
-        "videoconvert ! "
-        "video/x-raw, format=(string)BGR ! appsink drop=1"
-    )
+def parse_args():
+    parser = argparse.ArgumentParser(description="High-FPS Obstacle Avoidance for Jetson Nano")
+    parser.add_argument("--input", type=str, default="csi://0", help="Camera input URI (e.g. csi://0)")
+    parser.add_argument("--network", type=str, default="ssd-mobilenet-v1", help="AI Model: ssd-mobilenet-v1 (Fastest, 25-30 FPS) or ssd-mobilenet-v2")
+    parser.add_argument("--threshold", type=float, default=0.45, help="Detection confidence threshold")
+    parser.add_argument("--width", type=int, default=1280, help="Camera capture width")
+    parser.add_argument("--height", type=int, default=720, help="Camera capture height")
+    parser.add_argument("--rate", type=int, default=30, help="Camera framerate")
+    parser.add_argument("--headless", action="store_true", help="Run without graphical display for max FPS")
+    parser.add_argument("--frame-skip", type=int, default=1, help="Inference every N frames (1=every frame, 2=every 2nd frame)")
+    parser.add_argument("--kp", type=float, default=1.2, help="Proportional steering gain Kp")
+    return parser.parse_args()
 
-print("Đang khởi động Camera cho Mobile Robot...")
-cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=0), cv2.CAP_GSTREAMER)
-if not cap.isOpened():
-    cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=1), cv2.CAP_GSTREAMER)
+def main():
+    args = parse_args()
 
-if not cap.isOpened():
-    print("Lỗi: Không thể mở camera CSI. Vui lòng kiểm tra lại cáp.")
-    sys.exit()
+    print("=" * 65)
+    print("  HIGH-PERFORMANCE OBSTACLE AVOIDANCE SYSTEM (JETSON NANO)")
+    print(f"  Model       : {args.network}")
+    print(f"  Resolution  : {args.width}x{args.height} @ {args.rate} FPS")
+    print(f"  Headless    : {args.headless}")
+    print(f"  Frame Skip  : {args.frame_skip}")
+    print(f"  Steering Kp : {args.kp}")
+    print("=" * 65)
 
-time.sleep(1)
+    cam_options = [
+        f"--input-width={args.width}",
+        f"--input-height={args.height}",
+        f"--input-rate={args.rate}"
+    ]
+    camera = jetson.utils.videoSource(args.input, argv=cam_options)
+    if camera is None:
+        print(f"[ERROR] Cannot open camera: {args.input}")
+        sys.exit(1)
 
-net = None
-if USE_JETSON_INFERENCE:
-    print("Đang nạp mô hình AI SSD-MobileNet-v2 (TensorRT)...")
-    net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=0.45)
-    print("Nạp Model AI thành công!")
+    display = None
+    font = None
+    if not args.headless:
+        display = jetson.utils.videoOutput("display://0")
+        font = jetson.utils.cudaFont(size=22)
 
-WIDTH = 640
-HEIGHT = 480
-ZONE_LEFT_LIMIT = WIDTH // 3
-ZONE_RIGHT_LIMIT = 2 * (WIDTH // 3)
+    print(f"Loading TensorRT engine: {args.network}...")
+    try:
+        net = jetson.inference.detectNet(args.network, threshold=args.threshold)
+    except Exception as e:
+        print(f"[ERROR] Failed to load model {args.network}: {e}")
+        print("Falling back to ssd-mobilenet-v2...")
+        net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=args.threshold)
 
-prev_time = time.time()
-print("\n" + "="*60)
-print("HỆ THỐNG TRÁNH VẬT CẢN (OBSTACLE AVOIDANCE) ĐANG CHẠY!")
-print("Bấm phím 'q' trên màn hình Dell để THOÁT.")
-print("="*60 + "\n")
+    w = args.width
+    h = args.height
+    cx_ref = w / 2.0
+    fx = w * 0.8
+    zone_left = w / 3.0
+    zone_right = 2.0 * w / 3.0
 
-while True:
-    ret, frame = cap.read()
-    if not ret or frame is None:
-        time.sleep(0.01)
-        continue
-
-    current_time = time.time()
-    fps = 1 / (current_time - prev_time) if (current_time - prev_time) > 0 else 0
-    prev_time = current_time
-
+    frame_count = 0
+    fps_history = []
+    last_detections = []
     robot_action = "FORWARD"
-    action_color = (0, 255, 0)
-    obstacle_detected = False
+    v_lin = 0.3
+    w_ang = 0.0
 
-    if USE_JETSON_INFERENCE and net is not None:
-        cuda_img = jetson.utils.cudaFromNumpy(frame)
-        detections = net.Detect(cuda_img, overlay="none")
-        
-        for det in detections:
-            x1 = int(det.Left)
-            y1 = int(det.Top)
-            x2 = int(det.Right)
-            y2 = int(det.Bottom)
-            cx = int(det.Center[0])
-            bh = int(det.Height)
-            label = net.GetClassDesc(det.ClassID)
-            conf = det.Confidence
+    t_prev = time.time()
 
-            box_color = (0, 255, 0)
-            is_close = bh > 110
+    print("\n[READY] System running. Press Ctrl+C in terminal to stop.\n")
 
-            if is_close:
-                box_color = (0, 0, 255)
-                obstacle_detected = True
-                if ZONE_LEFT_LIMIT <= cx <= ZONE_RIGHT_LIMIT:
-                    robot_action = "STOP / EVADE"
-                    action_color = (0, 0, 255)
-                elif cx < ZONE_LEFT_LIMIT and robot_action != "STOP / EVADE":
-                    robot_action = "TURN RIGHT"
-                    action_color = (0, 255, 255)
-                elif cx > ZONE_RIGHT_LIMIT and robot_action != "STOP / EVADE":
-                    robot_action = "TURN LEFT"
-                    action_color = (0, 255, 255)
+    try:
+        while True:
+            if display is not None and not display.IsStreaming():
+                break
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-            cv2.putText(frame, f"{label} {conf:.2f}", (x1, max(y1 - 8, 15)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
+            t0 = time.time()
+            img = camera.Capture()
+            if img is None:
+                continue
+            t_cap = time.time() - t0
 
-    cv2.line(frame, (ZONE_LEFT_LIMIT, 0), (ZONE_LEFT_LIMIT, HEIGHT), (200, 200, 200), 1)
-    cv2.line(frame, (ZONE_RIGHT_LIMIT, 0), (ZONE_RIGHT_LIMIT, HEIGHT), (200, 200, 200), 1)
+            frame_count += 1
+            do_inference = (frame_count % args.frame_skip == 0)
 
-    cv2.putText(frame, "LEFT", (ZONE_LEFT_LIMIT // 2 - 25, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
-    cv2.putText(frame, "CENTER", (WIDTH // 2 - 35, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
-    cv2.putText(frame, "RIGHT", (ZONE_RIGHT_LIMIT + (WIDTH - ZONE_RIGHT_LIMIT)//2 - 30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+            t1 = time.time()
+            if do_inference:
+                overlay_flag = "none" if args.headless else "box,labels,conf"
+                detections = net.Detect(img, overlay=overlay_flag)
+                last_detections = detections
+            else:
+                detections = last_detections
+            t_infer = time.time() - t1
 
-    cv2.rectangle(frame, (0, HEIGHT - 65), (WIDTH, HEIGHT), (0, 0, 0), -1)
-    cv2.putText(frame, f"ACTION: {robot_action}", (20, HEIGHT - 22), cv2.FONT_HERSHEY_SIMPLEX, 1.0, action_color, 3)
-    cv2.putText(frame, f"FPS: {fps:.1f}", (WIDTH - 140, HEIGHT - 22), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            t2 = time.time()
+            robot_action = "FORWARD"
+            v_lin = 0.3
+            w_ang = 0.0
+            steer_error = 0.0
+            nearest_dist_est = 999.0
 
-    cv2.imshow("MOBILE ROBOT - OBSTACLE AVOIDANCE AI", frame)
+            hazard_detected = False
+            for det in detections:
+                box_h = det.Height
+                box_cx = det.Center[0]
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+                dist_est = (fx * 0.5) / max(box_h, 1.0)
+                if dist_est < nearest_dist_est:
+                    nearest_dist_est = dist_est
 
-cap.release()
-cv2.destroyAllWindows()
-print("Đã tắt hệ thống Robot an toàn.")
+                if box_h > (h * 0.22):
+                    hazard_detected = True
+                    steer_error = (box_cx - cx_ref) / fx
+                    w_ang = -args.kp * steer_error
+
+                    if zone_left <= box_cx <= zone_right:
+                        robot_action = "STOP / EVADE"
+                        v_lin = 0.0
+                        w_ang = 1.0 if box_cx < cx_ref else -1.0
+                        break
+                    elif box_cx < zone_left:
+                        robot_action = "TURN RIGHT"
+                        v_lin = 0.15
+                    elif box_cx > zone_right:
+                        robot_action = "TURN LEFT"
+                        v_lin = 0.15
+
+            t_logic = time.time() - t2
+
+            t_now = time.time()
+            dt = t_now - t_prev
+            t_prev = t_now
+            fps_instant = (1.0 / dt) if dt > 0 else 0.0
+
+            fps_history.append(fps_instant)
+            if len(fps_history) > 30:
+                fps_history.pop(0)
+            avg_fps = sum(fps_history) / len(fps_history)
+
+            if display is not None:
+                hud_text = f"ACTION: {robot_action} | V:{v_lin:.2f} W:{w_ang:.2f} | FPS: {avg_fps:.1f}"
+                font.OverlayText(img, text=hud_text, x=15, y=h - 40, color=(0, 255, 0, 255), background=(0, 0, 0, 180))
+
+                display.SetStatus(f"[{args.network}] FPS: {avg_fps:.1f} | Action: {robot_action}")
+                display.Render(img)
+
+            if frame_count % 15 == 0:
+                net_fps = net.GetNetworkFPS()
+                print(f"[METRICS] FPS: {avg_fps:4.1f} (Net: {net_fps:4.1f}) | Cap: {t_cap*1000:4.1f}ms | Infer: {t_infer*1000:4.1f}ms | Action: {robot_action:12s} | Dist: {nearest_dist_est:.2f}m")
+
+    except KeyboardInterrupt:
+        print("\n[STOP] User interrupted execution.")
+
+    finally:
+        print("[SHUTDOWN] Releasing camera and display resources...")
+        del camera
+        if display is not None:
+            del display
+        print("[DONE] Safe exit completed.")
+
+if __name__ == "__main__":
+    main()
